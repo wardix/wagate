@@ -1,6 +1,10 @@
 import { EventEmitter } from 'events'
 import { extractPhoneFromJid, isPhoneMatch, normalizePhone } from '../utils/phone.js'
+import { parseMessage } from '../inbound/message.parser.js'
+import { SafeMessageQueue } from '../outbound/message.queue.js'
 import type { IAuthStateAdapter } from './auth/auth.interface.js'
+import type { MessageRouter } from '../inbound/message.router.js'
+import type { MessageStore } from '../database/message.store.js'
 
 export type SessionStatus = 
   | 'INITIALIZING'
@@ -23,15 +27,21 @@ export class SessionInstance extends EventEmitter {
   public user: SessionUserInfo | null = null
   public socket: any = null
   public readonly expectedPhone: string
+  public readonly queue: SafeMessageQueue
 
   constructor(
     public readonly id: string,
     expectedPhone: string,
     private readonly authAdapter: IAuthStateAdapter,
-    private readonly socketFactory: (authState: any) => any
+    private readonly socketFactory: (authState: any) => any,
+    minDelayMs: number = 0,
+    maxDelayMs: number = 0,
+    private readonly messageRouter?: MessageRouter,
+    private readonly messageStore?: MessageStore
   ) {
     super()
     this.expectedPhone = normalizePhone(expectedPhone)
+    this.queue = new SafeMessageQueue(minDelayMs, maxDelayMs)
   }
 
   /**
@@ -46,7 +56,7 @@ export class SessionInstance extends EventEmitter {
       this.socket.ev.on('creds.update', saveCreds)
     }
 
-    // Handle connection update (bisa via socket.ev atau EventEmitter langsung)
+    // Handle connection update
     const onConnectionUpdate = async (update: any) => {
       const { connection, qr, lastDisconnect } = update
 
@@ -84,10 +94,12 @@ export class SessionInstance extends EventEmitter {
           phone: authenticatedPhone,
           name: userName
         }
+        this.queue.resume()
         this.emit('status', { status: this.status, user: this.user })
       }
 
       if (connection === 'close') {
+        this.queue.pause()
         const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
         if (statusCode === 401 || statusCode === 403) {
           this.status = 'LOGGED_OUT'
@@ -99,10 +111,60 @@ export class SessionInstance extends EventEmitter {
       }
     }
 
+    // Handle inbound messages
+    const onMessagesUpsert = async ({ messages, type }: any) => {
+      if (type !== 'notify' || !Array.isArray(messages)) return
+
+      for (const m of messages) {
+        const parsed = parseMessage(m)
+        if (!parsed) continue
+
+        // Simpan ke message store jika tersedia
+        if (this.messageStore) {
+          await this.messageStore.saveMessage({
+            sessionId: this.id,
+            messageId: parsed.id,
+            direction: m.key.fromMe ? 'outbound' : 'inbound',
+            from: parsed.from,
+            to: this.user?.id || this.expectedPhone,
+            senderName: parsed.senderName,
+            isGroup: parsed.isGroup,
+            text: parsed.text,
+            type: parsed.type,
+            status: m.key.fromMe ? 'sent' : 'delivered',
+            createdAt: new Date()
+          }).catch(() => {})
+        }
+
+        // Kirim ke message router untuk dievaluasi oleh handler
+        if (this.messageRouter && !m.key.fromMe) {
+          await this.messageRouter.dispatch(parsed, this).catch((err) => {
+            console.error(`[SessionInstance:${this.id}] Error pada message router:`, err)
+          })
+        }
+      }
+    }
+
+    // Handle receipts update (centang dua dan centang biru)
+    const onReceiptUpdate = async (receipts: any[]) => {
+      if (!this.messageStore || !Array.isArray(receipts)) return
+      for (const r of receipts) {
+        const messageId = r.key?.id
+        if (!messageId) continue
+        const status = r.receipt?.readTimestamp ? 'read' : 'delivered'
+        await this.messageStore.updateMessageStatus(messageId, status).catch(() => {})
+      }
+    }
+
+    // Pasang listener pada event emitter Baileys
     if (this.socket.ev && typeof this.socket.ev.on === 'function') {
       this.socket.ev.on('connection.update', onConnectionUpdate)
+      this.socket.ev.on('messages.upsert', onMessagesUpsert)
+      this.socket.ev.on('message-receipt.update', onReceiptUpdate)
     } else if (typeof this.socket.on === 'function') {
       this.socket.on('connection.update', onConnectionUpdate)
+      this.socket.on('messages.upsert', onMessagesUpsert)
+      this.socket.on('message-receipt.update', onReceiptUpdate)
     }
   }
 
@@ -111,6 +173,7 @@ export class SessionInstance extends EventEmitter {
    */
   async stop(): Promise<void> {
     this.status = 'DISCONNECTED'
+    this.queue.pause()
     if (this.socket) {
       if (typeof this.socket.end === 'function') {
         this.socket.end()

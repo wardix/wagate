@@ -1,5 +1,7 @@
 import { SessionInstance, type SessionStatus, type SessionUserInfo } from './session.instance.js'
 import type { IAuthStateAdapter } from './auth/auth.interface.js'
+import type { MessageRouter } from '../inbound/message.router.js'
+import type { MessageStore } from '../database/message.store.js'
 import { normalizePhone } from '../utils/phone.js'
 
 export interface SessionSummary {
@@ -15,7 +17,11 @@ export class SessionManager {
 
   constructor(
     private readonly authAdapter: IAuthStateAdapter,
-    private readonly socketFactory: (authState: any) => any
+    private readonly socketFactory: (authState: any) => any,
+    private readonly minDelayMs: number = 0,
+    private readonly maxDelayMs: number = 0,
+    private readonly messageRouter?: MessageRouter,
+    private readonly messageStore?: MessageStore
   ) {}
 
   /**
@@ -35,7 +41,11 @@ export class SessionManager {
       sessionId,
       normPhone,
       this.authAdapter,
-      this.socketFactory
+      this.socketFactory,
+      this.minDelayMs,
+      this.maxDelayMs,
+      this.messageRouter,
+      this.messageStore
     )
 
     this.sessions.set(sessionId, instance)

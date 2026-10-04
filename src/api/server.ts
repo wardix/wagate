@@ -2,9 +2,12 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { createSessionRouter } from './routes/session.routes.js'
+import { createMessageRouter } from './routes/message.routes.js'
+import { createQueueRouter } from './routes/queue.routes.js'
 import type { SessionManager } from '../core/session.manager.js'
+import type { MessageStore } from '../database/message.store.js'
 
-export function createServer(sessionManager: SessionManager): Hono {
+export function createServer(sessionManager: SessionManager, messageStore?: MessageStore): Hono {
   const app = new Hono()
 
   // Middlewares
@@ -19,8 +22,10 @@ export function createServer(sessionManager: SessionManager): Hono {
     version: '2.6.0'
   }))
 
-  // Mount session management routes
+  // Mount routes
   app.route('/api/v1/sessions', createSessionRouter(sessionManager))
+  app.route('/api/v1/sessions/:sessionId/messages', createMessageRouter(sessionManager, messageStore))
+  app.route('/api/v1/sessions/:sessionId/queue', createQueueRouter(sessionManager, messageStore))
 
   return app
 }
