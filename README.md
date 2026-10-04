@@ -6,7 +6,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![Oxlint](https://img.shields.io/badge/Linter-Oxlint-cyan?style=flat-square)](https://oxc.rs/)
-[![Vitest](https://img.shields.io/badge/Tests-Vitest_55_Passed-729B1B?style=flat-square&logo=vitest)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Tests-Vitest_60_Passed-729B1B?style=flat-square&logo=vitest)](https://vitest.dev/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-green.svg?style=flat-square)](https://opensource.org/licenses/ISC)
 
 ---
@@ -39,11 +39,14 @@ WAGate includes strict phone validation safeguards, an anti-ban persistent outbo
 5. **Modular Inbound Message Engine**  
    Pipeline-based `MessageContext` abstraction with built-in action helpers (`reply()`, `replyImage()`, `react()`, `simulateTyping()`, `markRead()`). Easily add commands, chatbots, or forward inbound chats to an external Webhook backend.
 
-6. **Single-Port Real-Time Web Dashboard**  
+6. **Dashboard & API Access Protection (HTTP Basic Auth + API Key)**  
+   Keep the web dashboard secure from unauthorized access using built-in HTTP Basic Auth (`DASHBOARD_USER` & `DASHBOARD_PASS`). External systems and scripts can authenticate via `X-Api-Key`, while `/health` remains publicly monitorable.
+
+7. **Single-Port Real-Time Web Dashboard**  
    Built with Vite, React 19, TypeScript, Tailwind CSS v4, Lucide Icons, and linted with lightning-fast **Oxlint**. The backend Hono server serves the compiled dashboard directly, eliminating CORS or multi-port setup issues in production.
 
-7. **Engineered with Strict TDD**  
-   All core features, phone normalization, authentication adapters, outbound queues, and REST routes are rigorously verified with **55 automated unit and integration tests** in Vitest.
+8. **Engineered with Strict TDD**  
+   All core features, phone normalization, authentication adapters, outbound queues, and REST routes are rigorously verified with **60 automated unit and integration tests** in Vitest.
 
 ---
 

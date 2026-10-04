@@ -13,5 +13,8 @@ export const config = {
   mediaStorageDir: process.env.MEDIA_STORAGE_DIR || './storage/media',
   queueMinDelayMs: parseInt(process.env.QUEUE_MIN_DELAY_MS || '1500', 10),
   queueMaxDelayMs: parseInt(process.env.QUEUE_MAX_DELAY_MS || '3000', 10),
-  webhookUrl: process.env.WEBHOOK_URL || ''
+  webhookUrl: process.env.WEBHOOK_URL || '',
+  authEnabled: process.env.AUTH_ENABLED !== 'false',
+  dashboardUser: process.env.DASHBOARD_USER || 'admin',
+  dashboardPass: process.env.DASHBOARD_PASS || 'admin123'
 }
