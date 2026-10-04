@@ -120,12 +120,40 @@ export function createSessionRouter(sessionManager: SessionManager): Hono {
   router.delete('/:sessionId', async (c) => {
     const sessionId = c.req.param('sessionId')
     
-    if (!sessionManager.hasSession(sessionId)) {
+    if (!sessionId || !sessionManager.hasSession(sessionId)) {
       return c.json({ success: false, error: `Sesi "${sessionId}" tidak ditemukan.` }, 404)
     }
 
     await sessionManager.deleteSession(sessionId)
     return c.json({ success: true, message: `Sesi "${sessionId}" berhasil dihapus.` })
+  })
+
+  /**
+   * POST /api/v1/sessions/:sessionId/restart
+   * Me-restart socket sesi yang terputus untuk memicu reconnect / QR baru
+   */
+  router.post('/:sessionId/restart', async (c) => {
+    const sessionId = c.req.param('sessionId')
+
+    if (!sessionId || !sessionManager.hasSession(sessionId)) {
+      return c.json({ success: false, error: `Sesi "${sessionId}" tidak ditemukan.` }, 404)
+    }
+
+    try {
+      const session = await sessionManager.restartSession(sessionId)
+      return c.json({
+        success: true,
+        message: `Sesi "${sessionId}" berhasil di-restart.`,
+        data: {
+          id: session.id,
+          status: session.status,
+          expectedPhone: session.expectedPhone,
+          qr: session.qr
+        }
+      })
+    } catch (err: any) {
+      return c.json({ success: false, error: err.message }, 500)
+    }
   })
 
   return router

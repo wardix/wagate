@@ -181,4 +181,21 @@ export class SessionInstance extends EventEmitter {
     }
     this.removeAllListeners()
   }
+
+  /**
+   * Menutup socket lama dan menginisialisasi ulang koneksi baru (misal untuk QR baru)
+   */
+  async restart(): Promise<void> {
+    if (this.socket) {
+      if (typeof this.socket.end === 'function') {
+        try {
+          this.socket.end()
+        } catch {}
+      }
+    }
+    this.status = 'INITIALIZING'
+    this.qr = null
+    this.user = null
+    await this.start()
+  }
 }

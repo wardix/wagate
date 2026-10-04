@@ -13,6 +13,7 @@ export function App() {
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [qrModalSession, setQrModalSession] = useState<SessionSummary | null>(null)
   const [queueModalSessionId, setQueueModalSessionId] = useState<string | null>(null)
   const [testSendSessionId, setTestSendSessionId] = useState<string | null>(null)
 
@@ -80,7 +81,10 @@ export function App() {
       <Navbar
         sessionCount={sessions.length}
         connectedCount={connectedCount}
-        onAddClick={() => setIsAddModalOpen(true)}
+        onAddClick={() => {
+          setQrModalSession(null)
+          setIsAddModalOpen(true)
+        }}
         onRefresh={fetchSessions}
         isLoading={isLoading}
       />
@@ -97,7 +101,10 @@ export function App() {
               Mulai hubungkan nomor WhatsApp Anda dengan mengklik tombol di bawah. Sistem akan meminta nomor target terlebih dahulu sebelum menghasilkan QR Code.
             </p>
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                setQrModalSession(null)
+                setIsAddModalOpen(true)
+              }}
               className="flex items-center space-x-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
             >
               <Plus className="w-5 h-5" />
@@ -119,7 +126,10 @@ export function App() {
                 <SessionCard
                   key={session.id}
                   session={session}
-                  onOpenQr={() => setIsAddModalOpen(true)}
+                  onOpenQr={(selectedSession) => {
+                    setQrModalSession(selectedSession)
+                    setIsAddModalOpen(true)
+                  }}
                   onOpenTestSend={() => setTestSendSessionId(session.id)}
                   onOpenQueue={() => setQueueModalSessionId(session.id)}
                   onDelete={handleDeleteSession}
@@ -138,8 +148,10 @@ export function App() {
       {/* Modals */}
       <AddSessionModal
         isOpen={isAddModalOpen}
+        initialSession={qrModalSession}
         onClose={() => {
           setIsAddModalOpen(false)
+          setQrModalSession(null)
           fetchSessions()
         }}
         onSuccess={() => {

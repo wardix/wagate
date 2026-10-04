@@ -1,61 +1,93 @@
 import React, { useState, useEffect } from 'react'
-import { X, QrCode, CheckCircle2, AlertTriangle, ShieldAlert, Loader2 } from 'lucide-react'
+import { X, QrCode, CheckCircle2, AlertTriangle, ShieldAlert, Loader2, RefreshCw } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+
+export interface SessionModalTarget {
+  id: string
+  expectedPhone: string
+  status?: string
+  qr?: string | null
+}
 
 interface AddSessionModalProps {
   isOpen: boolean
+  initialSession?: SessionModalTarget | null
   onClose: () => void
   onSuccess: () => void
 }
 
-export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [sessionId, setSessionId] = useState('')
-  const [expectedPhone, setExpectedPhone] = useState('')
+export const AddSessionModal: React.FC<AddSessionModalProps> = ({
+  isOpen,
+  initialSession,
+  onClose,
+  onSuccess
+}) => {
+  // Input states for creating a new session
+  const [inputSessionId, setInputSessionId] = useState('')
+  const [inputExpectedPhone, setInputExpectedPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  
+
+  // Track session created via this modal
+  const [createdSession, setCreatedSession] = useState<{ id: string; expectedPhone: string } | null>(null)
+
   // Real-time state during QR pairing
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string>('IDLE')
   const [connectedUser, setConnectedUser] = useState<any>(null)
   const [mismatchError, setMismatchError] = useState<string | null>(null)
+  const [isRestarting, setIsRestarting] = useState(false)
+
+  // Active target session (either existing session being re-scanned or newly created session)
+  const activeSessionId = initialSession?.id || createdSession?.id || null
+  const targetPhone = initialSession?.expectedPhone || createdSession?.expectedPhone || ''
+  const displayQr = qrCode || initialSession?.qr || null
 
   const handleClose = () => {
-    setSessionId('')
-    setExpectedPhone('')
+    setInputSessionId('')
+    setInputExpectedPhone('')
     setErrorMessage(null)
-    setActiveSessionId(null)
+    setCreatedSession(null)
     setQrCode(null)
     setSessionStatus('IDLE')
     setConnectedUser(null)
     setMismatchError(null)
+    setIsRestarting(false)
     onClose()
   }
 
-  // Setup Server-Sent Events (SSE) listener when activeSessionId is set
+  // Setup Server-Sent Events (SSE) listener when activeSessionId is present
   useEffect(() => {
     if (!activeSessionId) return
+
+    // Jika sesi terputus atau logged out saat modal dibuka, otomatis picu restart socket
+    if (initialSession && (initialSession.status === 'DISCONNECTED' || initialSession.status === 'LOGGED_OUT')) {
+      void fetch(`/api/v1/sessions/${activeSessionId}/restart`, { method: 'POST' }).catch(() => {})
+    }
 
     const eventSource = new EventSource(`/api/v1/sessions/${activeSessionId}/events`)
 
     eventSource.addEventListener('init', (e) => {
-      const data = JSON.parse(e.data)
-      if (data.qr) setQrCode(data.qr)
-      setSessionStatus(data.status)
-      if (data.user) setConnectedUser(data.user)
+      try {
+        const data = JSON.parse(e.data)
+        if (data.qr) setQrCode(data.qr)
+        if (data.status) setSessionStatus(data.status)
+        if (data.user) setConnectedUser(data.user)
+      } catch {}
     })
 
     eventSource.addEventListener('status', (e) => {
-      const data = JSON.parse(e.data)
-      if (data.qr) setQrCode(data.qr)
-      if (data.status) setSessionStatus(data.status)
-      if (data.user) setConnectedUser(data.user)
-      if (data.error) setMismatchError(data.error)
+      try {
+        const data = JSON.parse(e.data)
+        if (data.qr) setQrCode(data.qr)
+        if (data.status) setSessionStatus(data.status)
+        if (data.user) setConnectedUser(data.user)
+        if (data.error) setMismatchError(data.error)
 
-      if (data.status === 'CONNECTED') {
-        onSuccess()
-      }
+        if (data.status === 'CONNECTED') {
+          onSuccess()
+        }
+      } catch {}
     })
 
     eventSource.onerror = () => {
@@ -65,14 +97,14 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
     return () => {
       eventSource.close()
     }
-  }, [activeSessionId, onSuccess])
+  }, [activeSessionId, initialSession, onSuccess])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitNewSession = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
     setMismatchError(null)
 
-    if (!sessionId.trim() || !expectedPhone.trim()) {
+    if (!inputSessionId.trim() || !inputExpectedPhone.trim()) {
       setErrorMessage('ID Sesi dan Nomor WhatsApp wajib diisi.')
       return
     }
@@ -80,12 +112,15 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
     setIsSubmitting(true)
 
     try {
+      const cleanId = inputSessionId.trim().toLowerCase()
+      const cleanPhone = inputExpectedPhone.trim()
+
       const res = await fetch('/api/v1/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: sessionId.trim().toLowerCase(),
-          expectedPhone: expectedPhone.trim()
+          sessionId: cleanId,
+          expectedPhone: cleanPhone
         })
       })
 
@@ -95,7 +130,7 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
         throw new Error(data.error || 'Gagal membuat sesi baru.')
       }
 
-      setActiveSessionId(sessionId.trim().toLowerCase())
+      setCreatedSession({ id: cleanId, expectedPhone: cleanPhone })
       setSessionStatus('WAITING_QR')
       if (data.data?.qr) {
         setQrCode(data.data.qr)
@@ -107,6 +142,24 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
     }
   }
 
+  const handleManualRestart = async () => {
+    if (!activeSessionId) return
+    setIsRestarting(true)
+    setMismatchError(null)
+    setQrCode(null)
+    try {
+      const res = await fetch(`/api/v1/sessions/${activeSessionId}/restart`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success && data.data?.qr) {
+        setQrCode(data.data.qr)
+      }
+    } catch (err: any) {
+      console.error('Gagal me-restart sesi:', err)
+    } finally {
+      setIsRestarting(false)
+    }
+  }
+
   if (!isOpen) return null
 
   return (
@@ -114,7 +167,16 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
       <div className="bg-[#111b21] border border-[#202c33] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#202c33] bg-[#182229]">
-          <h2 className="font-semibold text-white text-base">Tambah Akun WhatsApp Baru</h2>
+          <div className="flex items-center space-x-2">
+            <QrCode className="w-5 h-5 text-emerald-400" />
+            <h2 className="font-semibold text-white text-base">
+              {activeSessionId ? (
+                <span>Pindai QR: <span className="font-mono text-emerald-400">{activeSessionId}</span></span>
+              ) : (
+                'Tambah Akun WhatsApp Baru'
+              )}
+            </h2>
+          </div>
           <button
             onClick={handleClose}
             className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-[#202c33] transition-colors"
@@ -126,8 +188,8 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
         {/* Content */}
         <div className="p-6">
           {!activeSessionId ? (
-            /* Form Input */
-            <form onSubmit={handleSubmit} className="space-y-4">
+            /* Form Input (Khusus Sesi Baru) */
+            <form onSubmit={handleSubmitNewSession} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-300 mb-1.5">
                   ID Sesi / Nama Akun (Unik)
@@ -135,8 +197,8 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
                 <input
                   type="text"
                   placeholder="contoh: cs-store, sales-jkt"
-                  value={sessionId}
-                  onChange={(e) => setSessionId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                  value={inputSessionId}
+                  onChange={(e) => setInputSessionId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#202c33] border border-[#2a3942] text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
                   required
                 />
@@ -150,8 +212,8 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
                 <input
                   type="text"
                   placeholder="contoh: 08123456789 atau 628123456789"
-                  value={expectedPhone}
-                  onChange={(e) => setExpectedPhone(e.target.value)}
+                  value={inputExpectedPhone}
+                  onChange={(e) => setInputExpectedPhone(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#202c33] border border-[#2a3942] text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors font-mono"
                   required
                 />
@@ -187,7 +249,7 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
               </button>
             </form>
           ) : (
-            /* Live QR / Pairing Screen */
+            /* Live QR / Pairing Screen (Sesi Baru maupun Sesi Eksis) */
             <div className="text-center py-2 space-y-4">
               {sessionStatus === 'CONNECTED' ? (
                 /* SUCCESS STATE */
@@ -197,12 +259,12 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
                   </div>
                   <h3 className="text-lg font-bold text-white">Akun Berhasil Terhubung!</h3>
                   <div className="bg-[#182229] p-3 rounded-xl border border-[#202c33] max-w-xs mx-auto text-xs space-y-1">
-                    <p className="text-gray-400">Nomor: <strong className="text-white font-mono">{connectedUser?.phone || expectedPhone}</strong></p>
+                    <p className="text-gray-400">Nomor: <strong className="text-white font-mono">{connectedUser?.phone || targetPhone}</strong></p>
                     {connectedUser?.name && <p className="text-gray-400">Profil: <strong className="text-emerald-400">{connectedUser.name}</strong></p>}
                   </div>
                   <button
                     onClick={handleClose}
-                    className="mt-4 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold"
+                    className="mt-4 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
                   >
                     Selesai & Tutup
                   </button>
@@ -218,18 +280,19 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
                     <p>{mismatchError || 'Nomor WhatsApp yang memindai QR berbeda dengan target nomor yang didaftarkan. Sesi otomatis dibatalkan demi keamanan.'}</p>
                   </div>
                   <button
-                    onClick={() => setActiveSessionId(null)}
-                    className="mt-2 px-5 py-2 bg-[#202c33] hover:bg-[#2a3942] text-gray-200 rounded-xl text-xs font-medium"
+                    onClick={handleManualRestart}
+                    disabled={isRestarting}
+                    className="mt-2 px-5 py-2 bg-[#202c33] hover:bg-[#2a3942] text-gray-200 rounded-xl text-xs font-medium cursor-pointer"
                   >
-                    Coba Lagi dengan Nomor yang Benar
+                    {isRestarting ? 'Menyiapkan QR Baru...' : 'Coba Lagi dengan Nomor yang Benar'}
                   </button>
                 </div>
               ) : (
                 /* QR DISPLAY */
                 <div className="space-y-4">
                   <div className="p-4 bg-white rounded-2xl inline-block shadow-lg">
-                    {qrCode ? (
-                      <QRCodeSVG value={qrCode} size={220} level="M" />
+                    {displayQr ? (
+                      <QRCodeSVG value={displayQr} size={220} level="M" />
                     ) : (
                       <div className="w-[220px] h-[220px] flex flex-col items-center justify-center text-gray-500 space-y-2">
                         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
@@ -239,8 +302,23 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
                   </div>
 
                   <div className="text-xs text-gray-300 space-y-1">
-                    <p className="font-semibold text-white">Pindai dengan WhatsApp nomor <span className="font-mono text-emerald-400">{expectedPhone}</span></p>
+                    <p className="font-semibold text-white">
+                      Pindai dengan WhatsApp nomor <span className="font-mono text-emerald-400">{targetPhone}</span>
+                    </p>
                     <p className="text-gray-400 text-[11px]">Buka WhatsApp di HP &gt; Menu (⋮) &gt; Perangkat Tertaut &gt; Tautkan Perangkat</p>
+                  </div>
+
+                  {/* Tombol Muat Ulang QR */}
+                  <div className="pt-2">
+                    <button
+                      onClick={handleManualRestart}
+                      disabled={isRestarting}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-[#202c33] hover:bg-[#2a3942] text-gray-300 rounded-lg text-xs font-medium border border-[#2a3942] cursor-pointer disabled:opacity-50 transition-colors"
+                      title="Minta QR code baru jika kode kedaluwarsa"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRestarting ? 'animate-spin text-emerald-400' : ''}`} />
+                      <span>{isRestarting ? 'Memperbarui QR...' : 'Muat Ulang QR'}</span>
+                    </button>
                   </div>
                 </div>
               )}

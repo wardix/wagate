@@ -102,4 +102,15 @@ describe('SessionManager & Strict Phone Verification', () => {
     expect(sessionManager.hasSession('cs-5')).toBe(false)
     expect(mockAuthAdapter.deleteAuthState).toHaveBeenCalledWith('cs-5')
   })
+
+  it('harus dapat me-restart sesi yang terputus untuk mendapatkan koneksi/QR baru', async () => {
+    const session = await sessionManager.createSession('cs-6', '08123456789')
+    mockSocket.emit('connection.update', { connection: 'close' })
+    expect(session.status).toBe('DISCONNECTED')
+
+    const restarted = await sessionManager.restartSession('cs-6')
+    expect(restarted.id).toBe('cs-6')
+    expect(mockSocket.end).toHaveBeenCalled()
+    expect(restarted.status).toBe('INITIALIZING')
+  })
 })

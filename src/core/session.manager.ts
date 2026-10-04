@@ -83,6 +83,18 @@ export class SessionManager {
   }
 
   /**
+   * Me-restart koneksi socket untuk sesi yang sudah ada (misal untuk QR baru setelah terputus)
+   */
+  async restartSession(sessionId: string): Promise<SessionInstance> {
+    const session = this.sessions.get(sessionId)
+    if (!session) {
+      throw new Error(`Sesi dengan ID "${sessionId}" tidak ditemukan.`)
+    }
+    await session.restart()
+    return session
+  }
+
+  /**
    * Mengambil ringkasan semua sesi yang terdaftar
    */
   getAllSessions(): SessionSummary[] {

@@ -6,7 +6,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![Oxlint](https://img.shields.io/badge/Linter-Oxlint-cyan?style=flat-square)](https://oxc.rs/)
-[![Vitest](https://img.shields.io/badge/Tests-Vitest_53_Passed-729B1B?style=flat-square&logo=vitest)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Tests-Vitest_55_Passed-729B1B?style=flat-square&logo=vitest)](https://vitest.dev/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-green.svg?style=flat-square)](https://opensource.org/licenses/ISC)
 
 ---
@@ -43,7 +43,7 @@ WAGate includes strict phone validation safeguards, an anti-ban persistent outbo
    Built with Vite, React 19, TypeScript, Tailwind CSS v4, Lucide Icons, and linted with lightning-fast **Oxlint**. The backend Hono server serves the compiled dashboard directly, eliminating CORS or multi-port setup issues in production.
 
 7. **Engineered with Strict TDD**  
-   All core features, phone normalization, authentication adapters, outbound queues, and REST routes are rigorously verified with **53 automated unit and integration tests** in Vitest.
+   All core features, phone normalization, authentication adapters, outbound queues, and REST routes are rigorously verified with **55 automated unit and integration tests** in Vitest.
 
 ---
 
@@ -170,7 +170,7 @@ Access the dashboard at `http://localhost:3000`.
 WAGate was built strictly following Test-Driven Development (TDD) principles.
 
 ```bash
-# Run all Vitest test suites (53 unit & integration tests)
+# Run all Vitest test suites (55 unit & integration tests)
 npm run test
 
 # Run tests in interactive watch mode
@@ -193,6 +193,7 @@ All requests can include an `X-Api-Key: <YOUR_API_KEY>` header if configured.
 | `GET` | `/api/v1/sessions` | List all active sessions and their connection statuses |
 | `POST` | `/api/v1/sessions` | Register session with expected phone number (`sessionId`, `expectedPhone`) |
 | `GET` | `/api/v1/sessions/:sessionId` | Get single session status and phone pairing detail |
+| `POST` | `/api/v1/sessions/:sessionId/restart` | Reconnect/restart disconnected session to trigger new QR code |
 | `DELETE` | `/api/v1/sessions/:sessionId` | Logout and delete session credentials |
 | `GET` | `/api/v1/sessions/:sessionId/events` | Real-time SSE stream (`qr`, `connection`, `mismatch`, `logout`) |
 

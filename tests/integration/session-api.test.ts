@@ -109,4 +109,24 @@ describe('Session REST API & SSE Endpoints (Hono)', () => {
     expect(json.success).toBe(true)
     expect(mockSessionManager.deleteSession).toHaveBeenCalledWith('cs-1')
   })
+
+  it('POST /api/v1/sessions/:id/restart: harus memanggil restartSession dan mengembalikan status sesi baru', async () => {
+    mockSessionManager.restartSession = vi.fn().mockResolvedValue({
+      id: 'cs-1',
+      status: 'WAITING_QR',
+      expectedPhone: '628123456789',
+      qr: 'new-qr-test-code'
+    })
+
+    const res = await app.request('/api/v1/sessions/cs-1/restart', {
+      method: 'POST'
+    })
+
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.data.id).toBe('cs-1')
+    expect(json.data.qr).toBe('new-qr-test-code')
+    expect(mockSessionManager.restartSession).toHaveBeenCalledWith('cs-1')
+  })
 })
