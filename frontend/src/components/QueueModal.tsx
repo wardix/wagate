@@ -13,6 +13,11 @@ export const QueueModal: React.FC<QueueModalProps> = ({ sessionId, isOpen, onClo
   const [isLoading, setIsLoading] = useState(false)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
 
+  const handleClose = () => {
+    setActionMessage(null)
+    onClose()
+  }
+
   const fetchQueue = useCallback(async () => {
     if (!sessionId) return
     setIsLoading(true)
@@ -30,11 +35,29 @@ export const QueueModal: React.FC<QueueModalProps> = ({ sessionId, isOpen, onClo
   }, [sessionId])
 
   useEffect(() => {
-    if (isOpen && sessionId) {
-      fetchQueue()
-      setActionMessage(null)
+    if (!isOpen || !sessionId) return
+    let active = true
+
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/v1/sessions/${sessionId}/queue`)
+        const data = await res.json()
+        if (active && data.success) {
+          setQueue(data.data || [])
+        }
+      } catch (err) {
+        console.error('Gagal mengambil antrean:', err)
+      } finally {
+        if (active) setIsLoading(false)
+      }
     }
-  }, [isOpen, sessionId, fetchQueue])
+
+    void load()
+
+    return () => {
+      active = false
+    }
+  }, [isOpen, sessionId])
 
   const handleCancelMessage = async (queueId: string) => {
     if (!sessionId) return
@@ -92,7 +115,7 @@ export const QueueModal: React.FC<QueueModalProps> = ({ sessionId, isOpen, onClo
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-emerald-400' : ''}`} />
             </button>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#202c33] transition-colors"
             >
               <X className="w-5 h-5" />

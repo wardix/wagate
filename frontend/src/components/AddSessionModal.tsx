@@ -21,19 +21,17 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
   const [connectedUser, setConnectedUser] = useState<any>(null)
   const [mismatchError, setMismatchError] = useState<string | null>(null)
 
-  // Reset modal state
-  useEffect(() => {
-    if (isOpen) {
-      setSessionId('')
-      setExpectedPhone('')
-      setErrorMessage(null)
-      setActiveSessionId(null)
-      setQrCode(null)
-      setSessionStatus('IDLE')
-      setConnectedUser(null)
-      setMismatchError(null)
-    }
-  }, [isOpen])
+  const handleClose = () => {
+    setSessionId('')
+    setExpectedPhone('')
+    setErrorMessage(null)
+    setActiveSessionId(null)
+    setQrCode(null)
+    setSessionStatus('IDLE')
+    setConnectedUser(null)
+    setMismatchError(null)
+    onClose()
+  }
 
   // Setup Server-Sent Events (SSE) listener when activeSessionId is set
   useEffect(() => {
@@ -118,7 +116,7 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#202c33] bg-[#182229]">
           <h2 className="font-semibold text-white text-base">Tambah Akun WhatsApp Baru</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-[#202c33] transition-colors"
           >
             <X className="w-5 h-5" />
@@ -203,7 +201,7 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({ isOpen, onClos
                     {connectedUser?.name && <p className="text-gray-400">Profil: <strong className="text-emerald-400">{connectedUser.name}</strong></p>}
                   </div>
                   <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="mt-4 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold"
                   >
                     Selesai & Tutup

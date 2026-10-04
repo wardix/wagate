@@ -9,7 +9,7 @@ import { Plus, MessageSquare } from 'lucide-react'
 
 export function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -17,7 +17,6 @@ export function App() {
   const [testSendSessionId, setTestSendSessionId] = useState<string | null>(null)
 
   const fetchSessions = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch('/api/v1/sessions')
       const data = await res.json()
@@ -32,11 +31,29 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    fetchSessions()
-    // Polling interval setiap 6 detik untuk update status sesi
-    const interval = setInterval(fetchSessions, 6000)
-    return () => clearInterval(interval)
-  }, [fetchSessions])
+    let active = true
+
+    const load = async () => {
+      try {
+        const res = await fetch('/api/v1/sessions')
+        const data = await res.json()
+        if (active && data.success) {
+          setSessions(data.data || [])
+        }
+      } catch (err) {
+        console.error('Gagal mengambil daftar sesi:', err)
+      } finally {
+        if (active) setIsLoading(false)
+      }
+    }
+
+    void load()
+    const interval = setInterval(load, 6000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [])
 
   const handleDeleteSession = async (sessionId: string) => {
     if (!confirm(`Yakin ingin menghapus sesi "${sessionId}"? Akun akan di-unlink dari WhatsApp.`)) {
