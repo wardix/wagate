@@ -56,12 +56,14 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({
     onClose()
   }
 
+  const initialSessionStatus = initialSession?.status
+
   // Setup Server-Sent Events (SSE) listener when activeSessionId is present
   useEffect(() => {
     if (!activeSessionId) return
 
     // Jika sesi terputus atau logged out saat modal dibuka, otomatis picu restart socket
-    if (initialSession && (initialSession.status === 'DISCONNECTED' || initialSession.status === 'LOGGED_OUT')) {
+    if (initialSessionStatus === 'DISCONNECTED' || initialSessionStatus === 'LOGGED_OUT') {
       void fetch(`/api/v1/sessions/${activeSessionId}/restart`, { method: 'POST' }).catch(() => {})
     }
 
@@ -97,7 +99,7 @@ export const AddSessionModal: React.FC<AddSessionModalProps> = ({
     return () => {
       eventSource.close()
     }
-  }, [activeSessionId, initialSession, onSuccess])
+  }, [activeSessionId, initialSessionStatus, onSuccess])
 
   const handleSubmitNewSession = async (e: React.FormEvent) => {
     e.preventDefault()

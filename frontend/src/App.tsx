@@ -154,9 +154,7 @@ export function App() {
           setQrModalSession(null)
           fetchSessions()
         }}
-        onSuccess={() => {
-          fetchSessions()
-        }}
+        onSuccess={fetchSessions}
       />
 
       <QueueModal

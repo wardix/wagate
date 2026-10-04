@@ -1,4 +1,4 @@
-import makeWASocket from '@whiskeysockets/baileys'
+import makeWASocket, { Browsers } from '@whiskeysockets/baileys'
 import pino from 'pino'
 
 /**
@@ -7,9 +7,9 @@ import pino from 'pino'
 export function createBaileysSocket(authState: any) {
   return makeWASocket({
     auth: authState,
-    logger: pino({ level: 'silent' }),
+    logger: pino({ level: 'warn' }),
     printQRInTerminal: false,
     syncFullHistory: false,
-    browser: ['WAGate Engine', 'Chrome', '120.0.0']
+    browser: Browsers.ubuntu('Chrome')
   })
 }

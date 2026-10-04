@@ -70,10 +70,12 @@ export class SessionInstance extends EventEmitter {
         const rawId = this.socket.user?.id || ''
         const userName = this.socket.user?.name || ''
         const authenticatedPhone = extractPhoneFromJid(rawId)
+        console.log(`[Session:${this.id}] Connection OPEN. Phone: ${authenticatedPhone}, Expected: ${this.expectedPhone}, User: ${userName}`)
 
         // STRICT PHONE VERIFICATION CHECK
         if (!isPhoneMatch(this.expectedPhone, authenticatedPhone)) {
           this.status = 'REJECTED'
+          console.warn(`[Session:${this.id}] STRICT VERIFICATION REJECTED: ${authenticatedPhone} !== ${this.expectedPhone}`)
           this.emit('status', { 
             status: this.status, 
             error: `Nomor tidak sesuai! Diharapkan: ${this.expectedPhone}, yang memindai: ${authenticatedPhone}` 
@@ -101,13 +103,30 @@ export class SessionInstance extends EventEmitter {
       if (connection === 'close') {
         this.queue.pause()
         const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
+        console.log(`[Session:${this.id}] Connection CLOSED. StatusCode: ${statusCode}`, (lastDisconnect?.error as any)?.message || '')
+
+        if (this.status === 'REJECTED') {
+          return
+        }
+
         if (statusCode === 401 || statusCode === 403) {
           this.status = 'LOGGED_OUT'
           await this.authAdapter.deleteAuthState(this.id)
+          this.emit('status', { status: this.status, lastDisconnect })
         } else {
           this.status = 'DISCONNECTED'
+          this.emit('status', { status: this.status, lastDisconnect })
+
+          // Auto-reconnect untuk restartRequired (515), connectionClosed (428), atau network drops
+          console.log(`[Session:${this.id}] Auto-reconnecting in 2 seconds...`)
+          setTimeout(() => {
+            if (this.status !== 'REJECTED' && this.status !== 'LOGGED_OUT') {
+              void this.start().catch((err) => {
+                console.error(`[Session:${this.id}] Gagal auto-reconnect:`, err)
+              })
+            }
+          }, 2000)
         }
-        this.emit('status', { status: this.status, lastDisconnect })
       }
     }
 

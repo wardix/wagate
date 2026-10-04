@@ -110,6 +110,11 @@ export function createSessionRouter(sessionManager: SessionManager): Hono {
       stream.onAbort(() => {
         session.off('status', onStatusUpdate)
       })
+
+      // Jaga koneksi stream tetap aktif sampai klien menutup koneksi
+      while (!stream.aborted) {
+        await stream.sleep(1000)
+      }
     })
   })
 
