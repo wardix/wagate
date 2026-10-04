@@ -1,0 +1,9 @@
+node_modules/
+dist/
+sessions/
+auth_session/
+storage/
+.env
+*.log
+.DS_Store
+coverage/
